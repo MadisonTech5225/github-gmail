@@ -1,23 +1,20 @@
 // Retriving user options
-chrome.extension.sendMessage({}, function (settings) {
+browser.runtime.sendMessage({}, function (settings) {
   initOnHashChangeAction(settings['Domains'])
-  initShortcuts(settings['Shortcut'], settings['BackgroundShortcut'], settings['MuteShortcut'])
-
   initListViewShortcut()
-  initForInbox()
 })
 
-chrome.runtime.onMessage.addListener(function (req) {
-  var element = req['muteURL'] ? document.querySelector('[href="' + req['muteURL'] + '"]') : null
-
-  if (element) {
-    element.innerText = "Muted!"
+browser.runtime.onMessage.addListener(function (req) {
+  if (req['muteURL']) {
+    const element = document.querySelector(`[href="${req['muteURL']}"]`)
+    if (element) element.innerText = "Muted!"
+  } else if (req['action']){
+    if (req['action'] === "open-link") triggerGitHubLink(false)
+    if (req['action'] === "open-link-in-background") triggerGitHubLink(true)
+    if (req['action'] === "mute-link") getVisible(document.querySelectorAll('.github-mute')).click()
   }
 })
 
-function initForInbox() {
-  window.idled = true
-}
 
 function initOnHashChangeAction(domains) {
   var allDomains = '//github.com,'
@@ -65,7 +62,7 @@ function initOnHashChangeAction(domains) {
 
             muteLink.addEventListener('click', function (evt) {
               evt.preventDefault()
-              chrome.extension.sendMessage({url: muteURL, active: false, mute: true})
+              browser.runtime.sendMessage({url: muteURL, active: false, mute: true})
               muteLink.innerHTML = '&ctdot;'
             })
           }
@@ -84,8 +81,6 @@ function initOnHashChangeAction(domains) {
             document.querySelector('.iH > div').appendChild(muteLink)
           }
 
-          window.idled = true
-
           document.getElementsByClassName('github-link')[0].addEventListener("DOMNodeRemovedFromDocument", function (ev) {
             fetchAndAppendGitHubLink()
           }, false)
@@ -102,33 +97,6 @@ function initOnHashChangeAction(domains) {
   }
 }
 
-function initShortcuts(shortcut, backgroundShortcut, muteShortcut) {
-  document.addEventListener('keydown', function (event) {
-    // Shortcut: bind user's combination, if a button exist and event not in a textarea
-    if (document.querySelector('.gE')) {
-      document.querySelector('.gE').classList.remove('github-link')
-    }
-
-    Array.prototype.forEach.call(document.querySelectorAll('.scroll-list-item-open .gE, .scroll-list-item-highlighted .gE'), function (ele) {
-      ele.classList.add('github-link')
-    })
-
-    if (processRightCombinationBasedOnShortcut(shortcut, event) && window.idled && getVisible(document.getElementsByClassName('github-link')) && notAnInput(event.target)) {
-      triggerGitHubLink(false)
-    }
-
-    // Bacground Shortcut: bind user's combination, if a button exist and event not in a textarea
-    if (processRightCombinationBasedOnShortcut(backgroundShortcut, event) && window.idled && getVisible(document.getElementsByClassName('github-link')) && notAnInput(event.target)) {
-      triggerGitHubLink(true)
-    }
-
-    // Mute Shortcut: bind user's combination, if a button exist and event not in a textarea
-    if (processRightCombinationBasedOnShortcut(muteShortcut, event) && window.idled && getVisible(document.getElementsByClassName('github-mute')) && notAnInput(event.target)) {
-      getVisible(document.getElementsByClassName('github-mute')).click()
-    }
-  })
-}
-
 function initListViewShortcut(regexp) {
   document.addEventListener('keypress', function (event) {
     // Shortcut: bind ctrl + return
@@ -141,12 +109,8 @@ function initListViewShortcut(regexp) {
 
 // Trigger the appended link in mail view
 function triggerGitHubLink (backgroundOrNot) {
-  // avoid link being appended multiple times
-  window.idled = false
   var link = getVisible(document.getElementsByClassName('github-link'))
-  chrome.extension.sendMessage({url: link.href, active: !backgroundOrNot})
-
-  setTimeout( function (){ window.idled = true }, 100)
+  browser.runtime.sendMessage({url: link.href, active: !backgroundOrNot})
 }
 
 // Go to selected email GitHub thread
